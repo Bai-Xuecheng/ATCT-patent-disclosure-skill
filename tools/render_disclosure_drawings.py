@@ -15,8 +15,14 @@ Typical usage:
 
 Supported drawing items in payload["drawings"]:
   1) {"no":"图1", "title":"...", "dot":"digraph G {...}"}
-  2) {"no":"图1", "title":"...", "nodes":[...], "edges":[...]}
+  2) {"no":"图1", "title":"...", "layout":"vertical|horizontal|layered", "nodes":[...], "edges":[...]}
   3) {"no":"图1", "title":"...", "path":"existing.png"}
+
+Generated drawing style:
+- white background, black outlines, black text, black arrows;
+- no figure number, figure title, or caption inside the image itself;
+- choose layout per content: vertical for linear flows, horizontal for pipelines,
+  layered/multi-rank for architecture diagrams or parallel modules.
 
 For maximum Word compatibility, the DOCX filler inserts PNG. The SVG and DOT
 files are delivered together as editable/vector source files.
@@ -63,16 +69,40 @@ def edge_tuple(edge: Any) -> Tuple[str, str, str]:
     raise ValueError(f"Invalid edge spec: {edge!r}")
 
 
+def rankdir_from_layout(drawing: Dict[str, Any]) -> str:
+    raw = clean_text(drawing.get("rankdir")) or clean_text(drawing.get("layout"))
+    key = raw.lower().replace("-", "_").replace(" ", "_")
+    if key in {"lr", "horizontal", "横向", "pipeline"}:
+        return "LR"
+    if key in {"rl"}:
+        return "RL"
+    if key in {"bt"}:
+        return "BT"
+    return "TB"
+
+
+def rank_groups(drawing: Dict[str, Any]) -> List[List[str]]:
+    groups = drawing.get("ranks") or drawing.get("layers") or []
+    result: List[List[str]] = []
+    if isinstance(groups, list):
+        for group in groups:
+            if isinstance(group, (list, tuple)):
+                cleaned = [sanitize_filename(clean_text(x), "N") for x in group if clean_text(x)]
+                if len(cleaned) >= 2:
+                    result.append(cleaned)
+    return result
+
+
 def dot_from_nodes_edges(drawing: Dict[str, Any]) -> str:
-    title = clean_text(drawing.get("title")) or "附图"
     graph_name = sanitize_filename(clean_text(drawing.get("no")) or "G", "G")
+    rankdir = rankdir_from_layout(drawing)
     nodes = list(drawing.get("nodes") or [])
     edges = list(drawing.get("edges") or [])
     lines: List[str] = [
         f"digraph {graph_name} {{",
-        "  graph [rankdir=TB, splines=ortho, nodesep=0.55, ranksep=0.65, dpi=220, labelloc=t, label=" + q(title) + "];",
-        f"  node [shape=box, style=\"rounded,filled\", fillcolor=\"#FFFFFF\", color=\"#444444\", penwidth=1.2, fontname={q(DEFAULT_FONT)}, fontsize=16, margin=\"0.12,0.08\"];",
-        f"  edge [color=\"#444444\", arrowsize=0.8, fontname={q(DEFAULT_FONT)}, fontsize=12];",
+        f"  graph [rankdir={rankdir}, bgcolor=\"#FFFFFF\", splines=ortho, nodesep=0.55, ranksep=0.65, dpi=220, pad=\"0.15\", margin=0];",
+        f"  node [shape=box, style=\"filled\", fillcolor=\"#FFFFFF\", color=\"#000000\", fontcolor=\"#000000\", penwidth=1.6, fontname={q(DEFAULT_FONT)}, fontsize=16, margin=\"0.16,0.10\"];",
+        f"  edge [color=\"#000000\", fontcolor=\"#000000\", penwidth=1.3, arrowsize=0.8, fontname={q(DEFAULT_FONT)}, fontsize=12];",
     ]
     if nodes:
         for node in nodes:
@@ -83,6 +113,8 @@ def dot_from_nodes_edges(drawing: Dict[str, Any]) -> str:
                 node_id = sanitize_filename(clean_text(node), f"N{len(lines)}")
                 label = clean_text(node)
             lines.append(f"  {node_id} [label={q(label)}];")
+    for group in rank_groups(drawing):
+        lines.append("  { rank=same; " + "; ".join(group) + "; }")
     for edge in edges:
         src, dst, label = edge_tuple(edge)
         src = sanitize_filename(src, "N1")
@@ -95,8 +127,9 @@ def dot_from_nodes_edges(drawing: Dict[str, Any]) -> str:
 
 def normalize_dot(dot: str) -> str:
     dot = clean_text(dot)
-    # Do not attempt full parsing; just return user DOT. The prompt should include
-    # graph/node/edge font settings for Chinese rendering.
+    # Do not attempt full parsing; just return user DOT. The prompt must keep
+    # custom DOT in the same white-background/black-outline style and must not
+    # include figure numbers, titles, captions, or graph labels inside the image.
     return dot + ("\n" if dot and not dot.endswith("\n") else "")
 
 

@@ -111,6 +111,14 @@ S3，……。
 
 `drawings` 至少给出图1。建议图1为系统整体架构图或核心流程图。
 
+附图图片风格必须统一为：白底、黑色边框、黑色文字、黑色箭头，不使用彩色填充、渐变、阴影、圆角装饰或复杂背景。流程卡片排布应根据实际技术关系选择：
+
+- 线性步骤、时序流程：使用纵向自上而下排布；
+- 数据流水线、输入到输出链路：使用横向从左到右排布；
+- 系统架构、并行模块、分层控制链路：使用多层堆叠或分层 rank 排布。
+
+图片内部不得写“图1”“图2”等图号、图题或描述性标题，也不得写“图1为……图”。图号和图题只保留在 payload 的 `no`、`title` 字段以及 Word 正文的图注/附图说明中。
+
 为保证附图清晰且可编辑，优先在 `drawings` 中给出 `nodes` / `edges` 或 `dot`，不要只写图片占位。工具会生成：
 
 - `.dot`：可编辑源文件；
@@ -123,6 +131,7 @@ S3，……。
 {
   "no": "图1",
   "title": "系统整体架构图",
+  "layout": "vertical",
   "nodes": [
     {"id": "A", "label": "数据采集模块"},
     {"id": "B", "label": "特征处理模块"},
@@ -139,7 +148,7 @@ S3，……。
 {
   "no": "图2",
   "title": "核心控制流程图",
-  "dot": "digraph G { graph [rankdir=TB, dpi=260]; node [shape=box, fontname=\"Noto Sans CJK SC\"]; A [label=\"输入\"]; B [label=\"处理\"]; A -> B; }"
+  "dot": "digraph G { graph [rankdir=TB, bgcolor=\"#FFFFFF\", dpi=260]; node [shape=box, style=\"filled\", fillcolor=\"#FFFFFF\", color=\"#000000\", fontcolor=\"#000000\", fontname=\"Noto Sans CJK SC\"]; edge [color=\"#000000\", fontcolor=\"#000000\"]; A [label=\"输入\"]; B [label=\"处理\"]; A -> B; }"
 }
 ```
 
